@@ -18,7 +18,7 @@ app.use(express.json());
 app.use(cookieParser());
 app.use(cors(
     { 
-        origin: ENV.CLIENT_URL, 
+        origin: true, // allow all origins (reflect request Origin)
         credentials: true,
         optionsSuccessStatus: 200,
         allowedHeaders: ['Content-Type', 'Authorization'],
