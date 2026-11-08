@@ -1,313 +1,89 @@
 import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Plus, Trash2, Pencil, Check, X, LogOut, Loader2, ArrowUpRight, ArrowRight, Search, ListTodo, CircleCheck, Circle, Asterisk, SlidersHorizontal } from 'lucide-react';
 import useAuthStore from '../../store/useAuthStore';
 import useTodoStore from '../../store/useTodoStore';
 import useToast from '../../hooks/useToast';
-import {
-    CheckSquare,
-    Plus,
-    Trash2,
-    Pencil,
-    Check,
-    X,
-    LogOut,
-    Loader2,
-    ClipboardList,
-} from 'lucide-react';
+import Brand from '../../components/Brand';
 
-const TodoItem = ({ todo, onToggle, onUpdate, onDelete }) => {
-    const [editing, setEditing] = useState(false);
-    const [draft, setDraft] = useState(todo.title);
-    const inputRef = useRef(null);
+function TodoItem({ todo, onToggle, onUpdate, onDelete, index }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(todo.title);
+  const inputRef = useRef(null);
+  const saving = useRef(false);
+  const [busy, setBusy] = useState(false);
+  const save = async () => {
+    if (saving.current) return;
+    const title = draft.trim();
+    if (!title || title === todo.title) { setEditing(false); return; }
+    saving.current = true; setBusy(true);
+    const success = await onUpdate(todo._id, { title });
+    if (success) setEditing(false);
+    saving.current = false; setBusy(false);
+  };
+  const edit = () => { setDraft(todo.title); setEditing(true); requestAnimationFrame(() => inputRef.current?.focus()); };
+  return <div className={`task-row ${todo.completed ? 'is-complete' : ''}`}>
+    <button className="task-check" aria-label={`${todo.completed ? 'Mark incomplete' : 'Complete'}: ${todo.title}`} aria-pressed={todo.completed} onClick={() => onToggle(todo._id, !todo.completed)}>{todo.completed && <Check size={15} strokeWidth={3} />}</button>
+    <div className="task-title">{editing ? <input ref={inputRef} aria-label="Edit task title" value={draft} disabled={busy} onChange={(e) => setDraft(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') save(); if (e.key === 'Escape') setEditing(false); }} /> : <span>{todo.title}</span>}</div>
+    <span className="task-status">{todo.completed ? 'Done' : 'To do'}</span>
+    <div className="task-actions">{editing ? <><button aria-label="Save task" disabled={busy} onClick={save}>{busy ? <Loader2 className="spin" size={16} /> : <Check size={16} />}</button><button aria-label="Cancel editing" disabled={busy} onClick={() => setEditing(false)}><X size={16} /></button></> : <><button aria-label={`Edit ${todo.title}`} onClick={edit}><Pencil size={15} /></button><button className="delete-task" aria-label={`Delete ${todo.title}`} onClick={() => onDelete(todo._id)}><Trash2 size={15} /></button></>}</div>
+    <span className="task-index">{String(index + 1).padStart(2, '0')}</span>
+  </div>;
+}
 
-    const startEdit = () => {
-        setDraft(todo.title);
-        setEditing(true);
-        setTimeout(() => inputRef.current?.focus(), 0);
-    };
-
-    const cancelEdit = () => {
-        setDraft(todo.title);
-        setEditing(false);
-    };
-
-    const saveEdit = () => {
-        const trimmed = draft.trim();
-        if (!trimmed) return cancelEdit();
-        if (trimmed !== todo.title) onUpdate(todo._id, { title: trimmed });
-        setEditing(false);
-    };
-
-    const handleKeyDown = (e) => {
-        if (e.key === 'Enter') saveEdit();
-        if (e.key === 'Escape') cancelEdit();
-    };
-
-    return (
-        <div className={`group flex items-center gap-3 px-4 py-3.5 rounded-2xl border transition-all duration-200 ${
-            todo.completed
-                ? 'bg-gray-50 border-gray-100'
-                : 'bg-white border-gray-200 hover:border-indigo-200 hover:shadow-sm'
-        }`}>
-            {/* Checkbox */}
-            <button
-                onClick={() => onToggle(todo._id, !todo.completed)}
-                className={`flex-shrink-0 w-5 h-5 rounded-md border-2 flex items-center justify-center transition-all duration-200 ${
-                    todo.completed
-                        ? 'bg-indigo-600 border-indigo-600'
-                        : 'border-gray-300 hover:border-indigo-400'
-                }`}
-            >
-                {todo.completed && <Check className="w-3 h-3 text-white" strokeWidth={3} />}
-            </button>
-
-            {/* Title / Edit input */}
-            <div className="flex-1 min-w-0">
-                {editing ? (
-                    <input
-                        ref={inputRef}
-                        value={draft}
-                        onChange={(e) => setDraft(e.target.value)}
-                        onKeyDown={handleKeyDown}
-                        onBlur={saveEdit}
-                        className="w-full text-sm text-gray-900 bg-transparent border-b-2 border-indigo-500 outline-none py-0.5"
-                    />
-                ) : (
-                    <span className={`text-sm leading-relaxed truncate block ${
-                        todo.completed ? 'line-through text-gray-400' : 'text-gray-800'
-                    }`}>
-                        {todo.title}
-                    </span>
-                )}
-            </div>
-
-            {/* Actions */}
-            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
-                {editing ? (
-                    <>
-                        <button
-                            onClick={saveEdit}
-                            className="p-1.5 rounded-lg text-green-600 hover:bg-green-50 transition"
-                            title="Save"
-                        >
-                            <Check className="w-4 h-4" />
-                        </button>
-                        <button
-                            onClick={cancelEdit}
-                            className="p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 transition"
-                            title="Cancel"
-                        >
-                            <X className="w-4 h-4" />
-                        </button>
-                    </>
-                ) : (
-                    <>
-                        <button
-                            onClick={startEdit}
-                            className="p-1.5 rounded-lg text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 transition"
-                            title="Edit"
-                        >
-                            <Pencil className="w-4 h-4" />
-                        </button>
-                        <button
-                            onClick={() => onDelete(todo._id)}
-                            className="p-1.5 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50 transition"
-                            title="Delete"
-                        >
-                            <Trash2 className="w-4 h-4" />
-                        </button>
-                    </>
-                )}
-            </div>
-        </div>
-    );
-};
-
-const Dashboard = () => {
-    const navigate = useNavigate();
-    const toast = useToast();
-    const { user, Logout: logout, GetProfile: getProfile } = useAuthStore();
-    const { todos, isLoading, isAdding, fetchTodos, addTodo, updateTodo, deleteTodo } = useTodoStore();
-
-    const [newTitle, setNewTitle] = useState('');
-    const [loggingOut, setLoggingOut] = useState(false);
-    const inputRef = useRef(null);
-
-    useEffect(() => {
-        if (!user) getProfile().catch(console.error);
-        fetchTodos().catch(console.error);
-    }, []);
-
-    const handleAdd = async (e) => {
-        e.preventDefault();
-        const trimmed = newTitle.trim();
-        if (!trimmed) return;
-        try {
-            await addTodo(trimmed);
-            setNewTitle('');
-            inputRef.current?.focus();
-        } catch {
-            toast.error('Failed to add todo.');
-        }
-    };
-
-    const handleToggle = async (id, completed) => {
-        try {
-            await updateTodo(id, { completed });
-        } catch {
-            toast.error('Failed to update todo.');
-        }
-    };
-
-    const handleUpdate = async (id, updates) => {
-        try {
-            await updateTodo(id, updates);
-        } catch {
-            toast.error('Failed to save changes.');
-        }
-    };
-
-    const handleDelete = async (id) => {
-        try {
-            await deleteTodo(id);
-            toast.success('Todo deleted.');
-        } catch {
-            toast.error('Failed to delete todo.');
-        }
-    };
-
-    const handleLogout = async () => {
-        setLoggingOut(true);
-        try {
-            await logout();
-            toast.success('Logged out. See you soon!');
-            navigate('/login');
-        } catch {
-            toast.error('Logout failed.');
-        } finally {
-            setLoggingOut(false);
-        }
-    };
-
-    const completedCount = todos.filter((t) => t.completed).length;
-    const total = todos.length;
-
-    return (
-        <div className="min-h-screen bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 p-4 sm:p-6 lg:p-8">
-            <div className="max-w-2xl mx-auto">
-
-                {/* Header */}
-                <div className="flex items-center justify-between mb-8">
-                    <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-900/40">
-                            <CheckSquare className="w-5 h-5 text-white" strokeWidth={2.5} />
-                        </div>
-                        <div>
-                            <h1 className="text-white font-bold text-lg leading-none">TodoFlow</h1>
-                            {user && (
-                                <p className="text-indigo-300 text-xs mt-0.5">
-                                    Hey, {user.firstName}!
-                                </p>
-                            )}
-                        </div>
-                    </div>
-                    <button
-                        onClick={handleLogout}
-                        disabled={loggingOut}
-                        className="flex items-center gap-1.5 text-indigo-300 hover:text-white text-sm font-medium transition px-3 py-1.5 rounded-lg hover:bg-white/10 disabled:opacity-50"
-                    >
-                        {loggingOut ? <Loader2 className="w-4 h-4 animate-spin" /> : <LogOut className="w-4 h-4" />}
-                        Logout
-                    </button>
-                </div>
-
-                {/* Stats bar */}
-                {total > 0 && (
-                    <div className="mb-5 bg-white/5 backdrop-blur rounded-2xl px-5 py-3.5 flex items-center gap-4 border border-white/10">
-                        <div className="flex-1">
-                            <div className="flex items-center justify-between text-xs text-indigo-300 mb-1.5">
-                                <span>{completedCount} of {total} done</span>
-                                <span>{Math.round((completedCount / total) * 100)}%</span>
-                            </div>
-                            <div className="h-1.5 bg-white/10 rounded-full overflow-hidden">
-                                <div
-                                    className="h-full bg-indigo-500 rounded-full transition-all duration-500"
-                                    style={{ width: `${(completedCount / total) * 100}%` }}
-                                />
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                {/* Add todo form */}
-                <form onSubmit={handleAdd} className="flex gap-2 mb-6">
-                    <input
-                        ref={inputRef}
-                        value={newTitle}
-                        onChange={(e) => setNewTitle(e.target.value)}
-                        placeholder="Add a new todo…"
-                        className="flex-1 px-4 py-3 rounded-xl bg-white/10 border border-white/10 text-white placeholder-indigo-300/60 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent backdrop-blur transition"
-                    />
-                    <button
-                        type="submit"
-                        disabled={isAdding || !newTitle.trim()}
-                        className="flex items-center gap-1.5 px-4 py-3 bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 text-white font-semibold text-sm rounded-xl shadow-lg shadow-indigo-900/40 transition disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                        {isAdding ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-                        Add
-                    </button>
-                </form>
-
-                {/* Todo list */}
-                <div className="space-y-2">
-                    {isLoading ? (
-                        <div className="flex items-center justify-center py-16">
-                            <Loader2 className="w-8 h-8 text-indigo-400 animate-spin" />
-                        </div>
-                    ) : todos.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center py-20 text-center">
-                            <div className="w-16 h-16 bg-white/5 rounded-2xl flex items-center justify-center mb-4 border border-white/10">
-                                <ClipboardList className="w-8 h-8 text-indigo-400" />
-                            </div>
-                            <h3 className="text-white font-semibold text-lg mb-1">No todos yet</h3>
-                            <p className="text-indigo-300 text-sm">Add your first task above to get started.</p>
-                        </div>
-                    ) : (
-                        <>
-                            {/* Pending todos */}
-                            {todos.filter((t) => !t.completed).map((todo) => (
-                                <TodoItem
-                                    key={todo._id}
-                                    todo={todo}
-                                    onToggle={handleToggle}
-                                    onUpdate={handleUpdate}
-                                    onDelete={handleDelete}
-                                />
-                            ))}
-
-                            {/* Completed section */}
-                            {completedCount > 0 && (
-                                <div className="pt-4">
-                                    <p className="text-xs font-semibold text-indigo-400 uppercase tracking-wider mb-2 px-1">
-                                        Completed ({completedCount})
-                                    </p>
-                                    {todos.filter((t) => t.completed).map((todo) => (
-                                        <TodoItem
-                                            key={todo._id}
-                                            todo={todo}
-                                            onToggle={handleToggle}
-                                            onUpdate={handleUpdate}
-                                            onDelete={handleDelete}
-                                        />
-                                    ))}
-                                </div>
-                            )}
-                        </>
-                    )}
-                </div>
-            </div>
-        </div>
-    );
-};
-
-export default Dashboard;
+export default function Dashboard() {
+  const navigate = useNavigate();
+  const toast = useToast();
+  const { user, Logout: logout, GetProfile: getProfile } = useAuthStore();
+  const { todos, isLoading, isAdding, fetchTodos, addTodo, updateTodo, deleteTodo } = useTodoStore();
+  const [newTitle, setNewTitle] = useState('');
+  const [loggingOut, setLoggingOut] = useState(false);
+  const [filter, setFilter] = useState('all');
+  const [search, setSearch] = useState('');
+  const [loadError, setLoadError] = useState(false);
+  const inputRef = useRef(null);
+  useEffect(() => {
+    if (!user) getProfile().catch(console.error);
+    fetchTodos().catch(() => setLoadError(true));
+  }, [fetchTodos, getProfile, user]);
+  const handleAdd = async (e) => {
+    e.preventDefault(); if (!newTitle.trim()) return;
+    try { await addTodo(newTitle.trim()); setNewTitle(''); inputRef.current?.focus(); }
+    catch { toast.error('Failed to add task.'); }
+  };
+  const handleUpdate = async (id, updates) => {
+    try { await updateTodo(id, updates); return true; }
+    catch { toast.error('Failed to save changes.'); return false; }
+  };
+  const handleDelete = async (id) => { try { await deleteTodo(id); toast.success('Task deleted.'); } catch { toast.error('Failed to delete task.'); } };
+  const handleLogout = async () => {
+    setLoggingOut(true);
+    try { await logout(); navigate('/login'); } catch { toast.error('Logout failed.'); } finally { setLoggingOut(false); }
+  };
+  const completed = todos.filter((todo) => todo.completed).length;
+  const remaining = todos.length - completed;
+  const progress = todos.length ? Math.round(completed / todos.length * 100) : 0;
+  const filtered = todos.filter((todo) => (filter === 'all' || (filter === 'completed' ? todo.completed : !todo.completed)) && todo.title.toLowerCase().includes(search.toLowerCase())).sort((a, b) => Number(a.completed) - Number(b.completed));
+  const views = [{ id: 'all', label: 'All tasks', icon: ListTodo, count: todos.length }, { id: 'active', label: 'In progress', icon: Circle, count: remaining }, { id: 'completed', label: 'Completed', icon: CircleCheck, count: completed }];
+  const date = new Intl.DateTimeFormat('en', { weekday: 'long', month: 'long', day: 'numeric' }).format(new Date());
+  const name = user?.firstName || 'friend';
+  return <div className="workspace">
+    <aside className="sidebar"><Brand /><div className="workspace-label"><span className="workspace-avatar">P</span><div>Personal workspace<small>A little space for your plans</small></div></div>
+      <span className="nav-caption">WORKSPACE</span><nav aria-label="Task views">{views.map(({ id, label, icon: Icon, count }) => <button key={id} className={`nav-item ${filter === id ? 'active' : ''}`} onClick={() => setFilter(id)}><Icon size={19} /><span>{label}</span><small>{count}</small></button>)}</nav>
+      <div className="sidebar-note"><Asterisk size={30} strokeWidth={1.5} /><h3>One thing<br />at a time.</h3><p>You don’t have to do it all.<br />Just the next thing.</p><span>A LITTLE DAILY REMINDER ↗</span></div>
+      <div className="sidebar-user"><span className="user-avatar">{name[0].toUpperCase()}</span><div>{user?.firstName || 'Your workspace'}<small>Personal account</small></div><button className="icon-button" onClick={handleLogout} disabled={loggingOut} aria-label="Log out">{loggingOut ? <Loader2 className="spin" size={18} /> : <LogOut size={18} />}</button></div>
+    </aside>
+    <div className="workspace-main"><header className="topbar"><span>Workspace <span className="breadcrumb-slash">/</span> <strong>My tasks</strong></span><span className="today-date">{date}</span><span className="mobile-avatar">{name[0].toUpperCase()}</span></header>
+      <main className="dashboard-content"><div className="page-heading"><div><span className="eyebrow orange-text">A FRESH PAGE, EVERY DAY</span><h1>A little focus.<br /><em>A lot of possibility.</em></h1><p>Hey {name}, let’s make space for a good day.</p></div><div className="heading-art" aria-hidden="true"><div className="art-sun"><Asterisk /></div><ArrowUpRight className="art-arrow" strokeWidth={1.1} /><span>MAKE IT HAPPEN.</span></div></div>
+      <div className="dashboard-grid"><section className="tasks-panel" aria-label="Your tasks"><div className="section-heading"><h2>Your daily edit<span>{todos.length}</span></h2><span className="quiet-label">SMALL STEPS. REAL PROGRESS.</span></div>
+        <form className="add-task" onSubmit={handleAdd}><Plus size={20} /><input ref={inputRef} aria-label="New task title" value={newTitle} onChange={(e) => setNewTitle(e.target.value)} placeholder="What’s on your mind?" /><button className="primary-button" disabled={isAdding || !newTitle.trim()}>{isAdding ? <Loader2 className="spin" size={17} /> : <><span>Add task</span><ArrowUpRight size={17} /></>}</button></form>
+        <div className="list-toolbar"><div className="task-tabs" aria-label="Filter tasks">{views.map(({ id, count }) => <button key={id} aria-pressed={filter === id} className={filter === id ? 'selected' : ''} onClick={() => setFilter(id)}>{id === 'all' ? 'All tasks' : id === 'active' ? 'Active' : 'Done'}<span>{count}</span></button>)}</div><label className="task-search"><Search size={16} /><input aria-label="Search tasks" placeholder="Search tasks" value={search} onChange={(e) => setSearch(e.target.value)} /></label></div>
+        <div className="task-list">{isLoading ? <div className="list-state" role="status"><Loader2 className="spin" />Loading your tasks…</div> : loadError ? <div className="list-state"><p>We couldn’t load your tasks.</p><button className="text-button" onClick={() => { setLoadError(false); fetchTodos().catch(() => setLoadError(true)); }}>Try again <ArrowRight size={16} /></button></div> : filtered.length ? filtered.map((todo, index) => <TodoItem key={todo._id} todo={todo} index={index} onToggle={(id, value) => handleUpdate(id, { completed: value })} onUpdate={handleUpdate} onDelete={handleDelete} />) : <div className="empty-state"><div className="empty-illustration"><ListTodo size={35} strokeWidth={1.3} /><span>✦</span></div><h3>{search ? 'Nothing by that name.' : filter === 'completed' ? 'Good things take a first step.' : filter === 'active' && todos.length ? 'Look at you. All caught up.' : 'Big plans start small.'}</h3><p>{search ? 'Try a different search to find your task.' : filter === 'completed' ? 'Your completed tasks will find a home here.' : filter === 'active' && todos.length ? 'Take a breath. You’ve earned a little pause.' : 'Add your first task. Get it out of your head and onto the page.'}</p>{!search && filter !== 'completed' && <button className="text-button" onClick={() => inputRef.current?.focus()}>Write something down <ArrowRight size={16} /></button>}</div>}</div>
+        <div className="list-footer"><span><SlidersHorizontal size={13} /> Your list, at your pace.</span><span>{remaining} {remaining === 1 ? 'task' : 'tasks'} to go</span></div>
+      </section>
+      <aside className="right-rail"><section className="progress-card"><div className="card-eyebrow">THE BIG PICTURE <ArrowUpRight size={18} /></div><h2>Look at you go.</h2><p>Every little check counts.</p><div className="progress-ring" style={{ '--progress': `${progress}%` }}><div><strong>{progress}<span>%</span></strong><small>COMPLETE</small></div></div><div className="progress-stats"><div><strong>{remaining.toString().padStart(2, '0')}</strong><span>To do</span></div><div><strong>{completed.toString().padStart(2, '0')}</strong><span>Done & dusted</span></div></div><div className="card-bottom">{progress === 100 && todos.length ? 'A clean slate. Nicely done.' : 'Progress over perfection. Always.'}</div></section>
+      <section className="daily-note"><span className="eyebrow">NOTE TO SELF</span><h3>Doing less,<br /><em>but better.</em></h3><p>Give your attention to the things that deserve it.</p><div><span>YOU’VE GOT THIS</span><Asterisk size={31} strokeWidth={1.4} /></div></section></aside></div>
+      <footer className="dashboard-footer"><span>Less busy. More intentional.</span><span>MADE FOR YOUR EVERYDAY ↗</span></footer>
+      </main></div>
+  </div>;
+}

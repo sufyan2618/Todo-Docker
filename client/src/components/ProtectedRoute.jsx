@@ -11,12 +11,12 @@ const ProtectedRoute = ({ children }) => {
         }
     }, [token, isAuthenticated, isCheckingAuth, CheckAuth]);
 
-    console.log("isAuthenticated", isAuthenticated, "token", token, "isCheckingAuth", isCheckingAuth);
+
 
     if (isCheckingAuth) {
         return (
-            <div className="min-h-screen flex items-center justify-center">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+            <div className="list-state" style={{ minHeight: '100vh' }}>
+                <div className="spin rounded-full h-8 w-8 border-2 border-[#244cbd] border-t-transparent" role="status" aria-label="Loading your workspace"></div>
             </div>
         );
     }
